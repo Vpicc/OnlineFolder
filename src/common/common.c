@@ -284,7 +284,7 @@ void download(int sockfd, char* fileName, char* clientName, int server) {
 
         downloaded += (int)packetToDownload.length;
 
-        sprintf(response,"%s %u %s","Uploaded ",downloaded, " bytes from file.");
+        sprintf(response,"%s %u %s","Downloaded ",downloaded, " bytes from file.");
 
         status = write(sockfd, response, PAYLOAD_SIZE);
         
@@ -337,93 +337,22 @@ void downloadCommand(int sockfd, char* path, char* clientName, int server) {
     if (status < 0) 
         printf("ERROR reading from socket\n");
 
+    printf("%s\n",response);
+
     download(sockfd,packetToDownload.fileName,packetToDownload.clientName,FALSE);
 
 }
 
-void inotifyUpCommand(int sockfd, char* path, char* clientName, int server) {
-    int status;
-    int fileSize;
-    int i = 0;
-    char buffer[PAYLOAD_SIZE] = {0};
-    char* fileName;
-    char* finalPath = malloc(strlen(path) + strlen(clientName) + 11);
-    uint16_t nread = 0;
-    uint32_t totalSize;
-    FILE *fp;
-    char response[PAYLOAD_SIZE];
-    char serialized[PACKET_SIZE];
-    packet packetToUpload;
 
-    // Pega o nome do arquivo a partir do path
-    fileName = strrchr(path,'/');
-    if(fileName != NULL){
-        fileName++;
-    } else {
-        fileName = path;
-    }
-
-    if(server) {
-        strcpy(finalPath,"");
-        strcat(finalPath,clientName);
-        strcat(finalPath,"/");
-        strcat(finalPath,fileName);
-    } else {
-        strncpy(finalPath,path,strlen(path)+1);
-    }
-
-    // Pega o tamanho do arquivo
-    fp = fopen(finalPath,"r");
-    if(fp == NULL) {
-        printf("ERROR Could not read file.\n");
-        return;
-    }
-    fseek(fp,0,SEEK_END);
-    fileSize = ftell(fp);
-    fseek(fp,0,SEEK_SET);
-
-    totalSize = fileSize / PAYLOAD_SIZE;
-
-    packetToUpload.type = TYPE_INOTIFY;
-    packetToUpload.seqn = i;
-    packetToUpload.length = nread;
-    packetToUpload.total_size = totalSize;
-    strncpy(packetToUpload.fileName,fileName,FILENAME_SIZE);
-    strncpy(packetToUpload.clientName,clientName,CLIENT_NAME_SIZE);
-    strncpy(packetToUpload._payload,buffer,PAYLOAD_SIZE);
-    
-    serializePacket(&packetToUpload,serialized);       
-    
-    /* write in the socket */
-
-    status = write(sockfd, serialized, PACKET_SIZE);
-    if (status < 0) 
-        printf("ERROR writing to socket\n");
-
-    bzero(response, PAYLOAD_SIZE);
-    
-    /* read from the socket */
-    status = read(sockfd, response, PAYLOAD_SIZE);
-    if (status < 0) 
-        printf("ERROR reading from socket\n");
-
-    printf("%s\n",response);
-
-    fclose(fp);
-    
-    upload(sockfd, path, clientName, server);
-    
-    free(finalPath);
-    
-}
-
-void *inotifyWatcher(void *inotifyClient){
+/*
+TODO: Avisar o servidor que aconteceu uma mudança e tratar a mesma...
+TODO: Criar uma tread no servidor que fica esperando esse aviso do cliente para com ele.
+*/
+void *inotifyWatcher(void *pathToWatch){
     int length;
     int fd;
     int wd;
     char buffer[BUF_LEN];
-    char pathComplet[500];
-    bzero(pathComplet,500);
 
     fd = inotify_init();
 
@@ -431,10 +360,10 @@ void *inotifyWatcher(void *inotifyClient){
         perror( "inotify_init" );
     }
 
-    wd = inotify_add_watch( fd, ((struct inotyClient*) inotifyClient)->userName, 
+    wd = inotify_add_watch( fd, (char *) pathToWatch, 
                             IN_CLOSE_WRITE | IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO);
 
-     while (1) {
+    while (1) {
         int i = 0;
         length = read( fd, buffer, BUF_LEN );
 
@@ -445,35 +374,30 @@ void *inotifyWatcher(void *inotifyClient){
         while ( i < length ) {
             struct inotify_event *event = ( struct inotify_event * ) &buffer[ i ];
             if ( event->len ) {
-                if ( event->mask & IN_CREATE || event->mask & IN_MOVED_TO) {
-                    if(strcmp(event->name,lastFile)!=0){
-                            //cria o caminho: username/file
-                            strcpy(pathComplet,((struct inotyClient*) inotifyClient)->userName );
-                            strcat(pathComplet,"/");
-                            strcat(pathComplet, event->name);
-                            printf( "\nThe file %s was created in %s.\n", event->name,((struct inotyClient*) inotifyClient)->userName);
-                            inotifyUpCommand(((struct inotyClient*) inotifyClient)->socket, pathComplet ,((struct inotyClient*) inotifyClient)->userName, FALSE);        
-                        }
-                        else{
-                            bzero(lastFile,100);
-                        }
-                }
-                else if ( event->mask & IN_DELETE || event->mask & IN_MOVED_FROM) {
-                        if(strcmp(event->name,lastFile)!=0){
-                            //cria o caminho: username/file
-                            strcpy(pathComplet,((struct inotyClient*) inotifyClient)->userName );
-                            strcat(pathComplet,"/");
-                            strcat(pathComplet, event->name);
-                            printf( "\nThe file %s was deleted in %s.\n", event->name,((struct inotyClient*) inotifyClient)->userName);
-                            inotifyDelCommand(((struct inotyClient*) inotifyClient)->socket, pathComplet ,((struct inotyClient*) inotifyClient)->userName);        
-                        }
-                        else{
-                            printf( "\nThe file %s not was deleted in %s.\n", event->name,((struct inotyClient*) inotifyClient)->userName);
-                            bzero(lastFile,100);
-                        }
-                        
+                if ( event->mask & IN_CREATE ) {
+                    if ( event->mask & IN_ISDIR ) {
+                        printf( "The directory %s was created in %s.\n", event->name,(char *) pathToWatch);       
                     }
-                    
+                    else {
+                        printf( "The file %s was created in %s.\n", event->name,(char *) pathToWatch);
+                    }
+                }
+                else if ( event->mask & IN_DELETE ) {
+                    if ( event->mask & IN_ISDIR ) {
+                        printf( "The directory %s was deleted in %s.\n", event->name,(char *) pathToWatch);       
+                    }
+                    else {
+                        printf( "The file %s was deleted in %s.\n", event->name,(char *) pathToWatch);
+                    }
+                }
+                else if ( event->mask & IN_MODIFY ) {
+                    if ( event->mask & IN_ISDIR ) {
+                        printf( "The directory %s was modified in %s.\n", event->name,(char *) pathToWatch );
+                    }
+                    else {
+                        printf( "The file %s was modified in %s.\n", event->name,(char *) pathToWatch);
+                    }
+                }
             }
             i += EVENT_SIZE + event->len;
         }
@@ -569,17 +493,17 @@ void delete(int sockfd,char* fileName, char* pathUser){
     pathToFile(filePath,pathUser,fileName);
 
     if(remove(filePath)==0){
-        sprintf(response,"%s deleted sucessfully\n",fileName);
+        sprintf(response,"%s deleted sucessfully",fileName);
         status = write(sockfd, response, PAYLOAD_SIZE);
         if (status < 0) 
             printf("ERROR writing to socket\n");
     }else{
-        sprintf(response,"%s could not be deleted\n",fileName);
+        sprintf(response,"%s could not be deleted",fileName);
         status = write(sockfd, response, PAYLOAD_SIZE);
         if (status < 0) 
             printf("ERROR writing to socket\n");
     }
-        printf("response delete: %s\n",response);
+        printf("response delete: %s",response);
 
 }
 
@@ -665,40 +589,7 @@ void list_files(int sockfd,char *pathToUser, int server){
     }
 }
 void list_clientCommand(int sockfd, char *clientName){
+
     list_files(sockfd,clientName,FALSE);
-}
-void inotifyDelCommand(int sockfd, char *path, char *clientName){
-    
-    char* fileName;
-    char serialized[PACKET_SIZE];
-    packet packetToDelete;
-    int status;
-    char response[PAYLOAD_SIZE];
-
-    fileName = getFileName(path);
-
-    setPacket(&packetToDelete,TYPE_INOTIFY_DELETE,0,0,0,fileName,clientName,"");
-
-    serializePacket(&packetToDelete,serialized);
-
-    /* write in the socket */
-
-    status = write(sockfd, serialized, PACKET_SIZE);
-    if (status < 0) 
-        printf("ERROR writing to socket\n");
-
-    
-    /* captura o executing command */
-    bzero(response, PAYLOAD_SIZE);
-    status = read(sockfd, response, PAYLOAD_SIZE);
-    if (status < 0) 
-        printf("ERROR reading from socket\n");
-    printf("%s", response);
-    /* captura a resposta da funcao delete */
-    bzero(response, PAYLOAD_SIZE);
-    status = read(sockfd, response, PAYLOAD_SIZE);
-    if (status < 0) 
-        printf("ERROR reading from socket\n");
-    printf("%s", response);
 
 }

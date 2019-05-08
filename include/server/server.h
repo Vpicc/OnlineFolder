@@ -25,10 +25,6 @@ void appendNewClient(int socketNewClient, char* userName);
   colocar em option INSERTDEVICE(0) para inserir e REMOVE DEVICE(1) para remover
 */
 int updateNumberOfDevices(struct clientList *client_node, int socketNumber, int option);
-/*
-  Retorna o socket do outro device, caso tenha dois conectados. Caso contrario, retorna -1
-*/
-int otherSocketDevice (char *userName, int actSocket);
 
 struct client
 {

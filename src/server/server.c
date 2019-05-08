@@ -31,6 +31,8 @@ void *handleConnection(void *socketDescriptor) {
 
     //TODO: Thread to receive updates from client
 
+    /*************************************/
+    //Reads the client name and update/search on the client list.
     bzero(buffer, PAYLOAD_SIZE);
     idUserName = read(newsockfd,buffer,PAYLOAD_SIZE);
     if(idUserName < 0)
@@ -42,7 +44,16 @@ void *handleConnection(void *socketDescriptor) {
 
     if(!findNode(buffer, clientList, &client_node)){
         appendNewClient(newsockfd, buffer);
+        /*
+        Cria se necessario a pasta do usuario no servidor
+        */
         checkAndCreateDir(pathServerUsers);
+        /*
+        Lança a thread que fica olhando o diretorio do servidor
+        if(pthread_create(&thread_id, NULL, inotifyWatcher, (void *) pathServerUsers) < 0){
+			    fprintf(stderr,"ERROR, could not create thread.\n");
+			    exit(-1);
+		}*/
         write(newsockfd, "authorized", 11);
     }
     else{
@@ -52,7 +63,18 @@ void *handleConnection(void *socketDescriptor) {
             write(newsockfd, "notauthorized", 14);
         }
         else{
+            /*
+            Cria se necessario a pasta do usuario no servidor
+            */
             checkAndCreateDir(pathServerUsers);
+            /*
+            Lança a thread que fica olhando o diretorio do servidor
+            
+            if(pthread_create(&thread_id, NULL, inotifyWatcher, (void *) pathServerUsers) < 0){
+			    fprintf(stderr,"ERROR, could not create thread.\n");
+			    exit(-1);
+		    }
+            */
             write(newsockfd, "authorized", 11);
         }
     }
@@ -64,6 +86,7 @@ void *handleConnection(void *socketDescriptor) {
         n = read(newsockfd, buffer, PACKET_SIZE);
         if (n < 0) 
             printf("ERROR reading from socket");
+
 
         if(n == 0) {
             printf("Empty response, closing\n");
@@ -91,72 +114,13 @@ void *handleConnection(void *socketDescriptor) {
         switch(incomingPacket.type) {
             case TYPE_UPLOAD:
                 download(newsockfd,incomingPacket.fileName,incomingPacket.clientName,TRUE);
-                int otherSocket;
-                write(newsockfd, buffer, PACKET_SIZE);
-                if(findNode(userName, clientList, &client_node)){
-                    otherSocket = otherSocketDevice(incomingPacket.clientName, newsockfd);
-                    if(otherSocket != -1){
-                        write(otherSocket, buffer, PACKET_SIZE);
-                    }
-                    else{
-                        //nao tem outro device
-                    }
-                }
-                else{
-                    //cliente nem esta na lista
-                }
-
-                break;
-            case TYPE_INOTIFY:
-                download(newsockfd,incomingPacket.fileName,incomingPacket.clientName,TRUE);
-                int otherSocketDev;
-                if(findNode(userName, clientList, &client_node)){
-                    otherSocketDev = otherSocketDevice(incomingPacket.clientName, newsockfd);
-                    if(otherSocket != -1){
-                        write(otherSocketDev, buffer, PACKET_SIZE);
-                    }
-                    else{
-                        //nao tem outro device
-                    }
-                }
-                else{
-                    //cliente nem esta na lista
-                }
                 break;
             case TYPE_DOWNLOAD:
                 upload(newsockfd,incomingPacket.fileName,incomingPacket.clientName,TRUE);
                 break;
             case TYPE_DELETE:
                 delete(newsockfd,incomingPacket.fileName, pathServerUsers);
-                write(newsockfd, buffer, PACKET_SIZE);
-                if(findNode(userName, clientList, &client_node)){
-                    otherSocketDev = otherSocketDevice(incomingPacket.clientName, newsockfd);
-                    if(otherSocket != -1){
-                        write(otherSocketDev, buffer, PACKET_SIZE);
-                    }
-                    else{
-                        //nao tem outro device
-                    }
-                }
-                else{
-                    //cliente nem esta na lista
-                }
                 break;
-            case TYPE_INOTIFY_DELETE:
-                delete(newsockfd,incomingPacket.fileName, pathServerUsers);
-                if(findNode(userName, clientList, &client_node)){
-                    otherSocketDev = otherSocketDevice(incomingPacket.clientName, newsockfd);
-                    if(otherSocket != -1){
-                        write(otherSocketDev, buffer, PACKET_SIZE);
-                    }
-                    else{
-                        //nao tem outro device
-                    }
-                }
-                else{
-                    //cliente nem esta na lista
-                }
-                break;            
             case TYPE_LIST_SERVER:
                 list_files(newsockfd,pathServerUsers, TRUE);
                 break;
@@ -233,33 +197,3 @@ int updateNumberOfDevices(struct clientList *client_node, int socketNumber, int 
     return 0;
 }
 
-int otherSocketDevice (char *userName, int actSocket){
-    int otherSocketDevice;
-    struct clientList *client_node = malloc(sizeof(*client_node));//node used to find the username on the list.
-    if(findNode(userName, clientList, &client_node)){
-        if(client_node->client.devices[0] == actSocket){
-            if(client_node->client.devices[1] != -1){
-                //tem outro device
-                otherSocketDevice = client_node->client.devices[1];
-                return otherSocketDevice;
-            }
-            else{
-                return -1;
-            }
-        }
-        else{
-            if(client_node->client.devices[0] != -1){
-                //tem outro device
-                otherSocketDevice = client_node->client.devices[0];
-                return otherSocketDevice;
-            }
-            else{
-                return -1;
-            }
-        }
-    }
-    else{
-        return -1;
-    }
-
-}
