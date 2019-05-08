@@ -25,11 +25,9 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     struct hostent *server;
     int idUserName;
-    pthread_t thread_id, thread_id2;
-    char *fileName;
+    pthread_t thread_id;
 
     bzero(command,PAYLOAD_SIZE);
-    bzero(lastFile,100);
 
     if (argc < 3) {
 		fprintf(stderr,"usage %s hostname\n", argv[0]);
@@ -69,18 +67,11 @@ int main(int argc, char *argv[])
     /*
     Espera autorização do servidor para validar a conexão
     */
-    struct inotyClient *inotyClient = malloc(sizeof(*inotyClient));
-    inotyClient->socket = sockfd;
-    strcpy(inotyClient->userName, argv[1]);
     while(authorization == WAITING){
         read(sockfd, response, PAYLOAD_SIZE);
         if(strcmp(response,"authorized") == 0){
             checkAndCreateDir(argv[1]);
-            if(pthread_create(&thread_id, NULL, inotifyWatcher, (void *) inotyClient) < 0){
-			    fprintf(stderr,"ERROR, could not create thread.\n");
-			    exit(-1);
-		    }
-            if(pthread_create(&thread_id2, NULL, listener, (void *) &sockfd) < 0){
+            if(pthread_create(&thread_id, NULL, inotifyWatcher, (void *) argv[1]) < 0){
 			    fprintf(stderr,"ERROR, could not create thread.\n");
 			    exit(-1);
 		    }
@@ -100,8 +91,6 @@ int main(int argc, char *argv[])
         printf("\nEnter the Command: ");
         bzero(command, PAYLOAD_SIZE);
         fgets(command, PAYLOAD_SIZE, stdin);
-        if(strcspn(command, "\n")>0)
-            command[strcspn(command, "\n")] = 0;
 
         option = strtok(command," ");
         path = strtok(NULL," ");
@@ -111,36 +100,21 @@ int main(int argc, char *argv[])
 
         printf("OPTION: %s\n", option);
         printf("PATH: %s\n", path);
+        
 
         // Switch for options
         if(strcmp(option,"exit\n") == 0) {
             exitCommand = TRUE;
         } else if (strcmp(option, "upload") == 0) { // upload from path
-            fileName = strrchr(path,'/');
-            if(fileName != NULL){
-                fileName++;
-            } 
-            else {
-                fileName = path;
-            }
-            strcpy(lastFile, fileName); 
-            uploadCommand(sockfd,path,argv[1], FALSE);   
+            uploadCommand(sockfd,path,argv[1], FALSE);          
         } else if (strcmp(option, "download") == 0) { // download to exec folder
             downloadCommand(sockfd,path,argv[1], FALSE);
         } else if (strcmp(option, "delete") == 0) { // delete from syncd dir
-            fileName = strrchr(path,'/');
-            if(fileName != NULL){
-                fileName++;
-            } 
-            else {
-                fileName = path;
-            }
-            strcpy(lastFile, fileName);
-            deleteCommand(sockfd,path,argv[1]);
+            
         } else if (strcmp(option, "list_server") == 0) { // list user's saved files on dir
-            list_serverCommand(sockfd,argv[1]);
+            
         } else if (strcmp(option, "list_client") == 0) { // list saved files on dir
-            list_clientCommand(sockfd,argv[1]);
+            
         } else if (strcmp(option, "get_sync_dir") == 0) { // creates sync_dir_<username> and syncs
             
         } else if (strcmp(option, "printar") == 0) { // creates sync_dir_<username> and syncs

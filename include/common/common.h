@@ -39,10 +39,6 @@
 
 #define  TYPE_GET_SYNC_DIR 60
 
-#define TYPE_INOTIFY 70
-
-#define TYPE_INOTIFY_DELETE 75
-
 
 typedef struct packet {
     uint16_t type; // Tipo do pacote ( DATA | CMD )
@@ -54,12 +50,6 @@ typedef struct packet {
     char _payload[PAYLOAD_SIZE]; // Dados do pacote
 } packet;
 
-char lastFile[100];
-
-struct inotyClient{
-  char userName[52];
-  int socket;
-};
 
 #define PACKET_SIZE (sizeof (struct packet))
 
@@ -75,8 +65,6 @@ void download(int sockfd, char* fileName, char* clientName, int server);
 
 void downloadCommand(int sockfd, char* path, char* clientName, int server);
 
-void inotifyUpCommand(int sockfd, char* path, char* clientName, int server);
-
 /*
   Lança uma thread para ficar no watcher no path de argumento
 */
@@ -86,22 +74,4 @@ void *inotifyWatcher(void *pathToWatch);
   Verifica se o usuario já tem o diretorio criado na pasta User com seu nome, e se não tiver já o cria
 */
 int checkAndCreateDir(char *pathName);
-/*
- Retorna o nome do arquivo a partir do path
-*/
-char* getFileName(char *path);
-/*
- Atribui valores ao packet 
-*/
-void setPacket(packet *packetToSet,int type, int seqn, int length, int total_size, char* fileName, char* clientName, char* payload);
-/*
- Atribui caminho relativo ate arquivo
-*/
-void pathToFile(char* pathToFile ,char* pathUser, char* fileName);
 
-void delete(int sockfd,char* fileName, char* pathUser);
-void deleteCommand(int sockfd, char *path, char *clientName);
-void list_serverCommand(int sockfd, char *clientName);
-void list_clientCommand(int sockfd, char *clientName);
-void list_files(int sockfd,char *pathToUser, int server);
-void inotifyDelCommand(int sockfd, char *path, char *clientName);
