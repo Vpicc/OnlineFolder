@@ -4,6 +4,7 @@
         "unistd.h": "c",
         "types.h": "c",
         "socket.h": "c",
-        "common.h": "c"
+        "common.h": "c",
+        "linkedlist.h": "c"
     },
 }

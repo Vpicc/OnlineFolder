@@ -1,3 +1,5 @@
+#ifndef __linkedlist__
+#define __linkedlist__
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -29,3 +31,5 @@ int isEmpty(struct clientList *clientList);
 Encontra um cliente na lista apartir do username do mesmo. Retorna 0 caso não encontre o clinte 
 */
 int findNode(char *userName, struct clientList *clientList, struct clientList **client);
+
+#endif

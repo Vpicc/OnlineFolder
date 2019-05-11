@@ -1,3 +1,5 @@
+#ifndef __server__
+#define __server__
 #define MAXNAME 64
 #define MAXFILES 20
 #define FREEDEV -1
@@ -26,6 +28,8 @@ void appendNewClient(int socketNewClient, char* userName);
 */
 int updateNumberOfDevices(struct clientList *client_node, int socketNumber, int option);
 
+int otherSocketDevice (char *userName, int actSocket);
+
 struct client
 {
   int devices[2];
@@ -37,3 +41,5 @@ struct clientList
   struct client client;
   struct clientList *next;
 };
+
+#endif
