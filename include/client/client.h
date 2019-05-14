@@ -26,13 +26,23 @@ struct inotyClient{
 };
 
 char lastFile[FILENAME_SIZE];
-
+/*
+  Listener do cliente que recebe todos os pacotes que inicializam uma operação com o servidor e decide o que fazer de acordo com o pacote
+*/
 void *listener(void *socket);
 
+/*
+  Faz a sincronização inicial do servidor
+*/
 void synchronize(int sockfd,char* clientName);
-
+/*
+  Recebe o retorno do servidor do list_server e imprime na tela
+*/
 void clientListServer(int sockfd);
 
+/*
+  Faz o download dos arquivos que estão na pasta do servidor
+*/
 void clientSyncServer(int sockfd, char* clientName);
 
 /*
