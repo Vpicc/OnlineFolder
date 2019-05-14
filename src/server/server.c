@@ -28,11 +28,7 @@ void *handleConnection(void *socketDescriptor) {
     int otherSocket;
 
 
-  
-    //TODO: get_sync_dir, creates directory, if not created
 
-
-    //TODO: Thread to receive updates from client
 
     /*************************************/
     //Reads the client name and update/search on the client list.
@@ -117,9 +113,41 @@ void *handleConnection(void *socketDescriptor) {
                     //cliente nem esta na lista
 }
                 break;
+            case TYPE_INOTIFY:
+                readyToDownload(newsockfd,incomingPacket.fileName,incomingPacket.clientName);
+                download(newsockfd,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                if(findNode(userName, clientList, &client_node)){
+                    otherSocket = otherSocketDevice(incomingPacket.clientName, newsockfd);
+                    if(otherSocket != -1){
+                        uploadCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                        upload(otherSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                    }
+                    else{
+                        //nao tem outro device
+                    }
+                }
+                else{
+                    //cliente nem esta na lista
+                }
+                break;
             case TYPE_DOWNLOAD:
                 readyToUpload(newsockfd,incomingPacket.fileName,incomingPacket.clientName);
                 upload(newsockfd,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                break;
+            case TYPE_INOTIFY_DELETE:
+                delete(newsockfd,incomingPacket.fileName, pathServerUsers);
+                if(findNode(userName, clientList, &client_node)){
+                    otherSocket = otherSocketDevice(incomingPacket.clientName, newsockfd);
+                    if(otherSocket != -1){
+                        deleteCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName);
+                    }
+                    else{
+                        //nao tem outro device
+                    }
+                }
+                else{
+                    //cliente nem esta na lista
+                }
                 break;
             case TYPE_DELETE:
                 delete(newsockfd,incomingPacket.fileName, pathServerUsers);

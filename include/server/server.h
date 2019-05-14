@@ -1,3 +1,5 @@
+#ifndef __server__
+#define __server__
 #define MAXNAME 64
 #define MAXFILES 20
 #define FREEDEV -1
@@ -14,7 +16,9 @@
 
 struct clientList *clientList; //Inicialização do nodo inicial da lista de clientes
 
-
+/*
+  Função que escuta a nova conexão de cliente e faz dispatch dos comandos de acordo com o packet recebido
+*/
 void *handleConnection(void *socketDescriptor);
 /*
   Adiciona um novo cliente na lista de clientes
@@ -26,6 +30,9 @@ void appendNewClient(int socketNewClient, char* userName);
 */
 int updateNumberOfDevices(struct clientList *client_node, int socketNumber, int option);
 
+/*
+  Procura um segundo socket associado a um cliente
+*/
 int otherSocketDevice (char *userName, int actSocket);
 
 struct client
@@ -39,3 +46,5 @@ struct clientList
   struct client client;
   struct clientList *next;
 };
+
+#endif

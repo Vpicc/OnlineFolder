@@ -1,3 +1,5 @@
+#ifndef __common__
+#define __common__
 /**
  * 
  * 
@@ -51,6 +53,8 @@
 
 #define TYPE_INOTIFY_DELETE 75
 
+#define PACKET_SIZE (sizeof (struct packet))
+
 
 typedef struct packet {
     uint16_t type; // Tipo do pacote ( DATA | CMD )
@@ -63,20 +67,16 @@ typedef struct packet {
 } packet;
 
 
-#define PACKET_SIZE (sizeof (struct packet))
-
-char lastFile[100];
-
 // Global entre listener e client
 char clientPath[768];
 
-struct inotyClient{
-  char userName[CLIENT_NAME_SIZE];
-  int socket;
-};
-
+/*
+  Serializa um packet para um array de chars
+*/
 void serializePacket(packet* inPacket, char* serialized);
-
+/*
+  Desserializa um array de chars para um packet
+*/
 void deserializePacket(packet* outPacket, char* serialized);
 
 /**
@@ -85,7 +85,7 @@ void deserializePacket(packet* outPacket, char* serialized);
 void upload(int sockfd, char* path, char* clientName, int server);
 
 /**
- * Manda um Packet do TYPE_UPLOAD, depois envia usando a funcao upload
+ * Manda um Packet do TYPE_UPLOAD
  * */
 void uploadCommand(int sockfd, char* path, char* clientName, int server);
 
@@ -95,20 +95,38 @@ void uploadCommand(int sockfd, char* path, char* clientName, int server);
 void download(int sockfd, char* fileName, char* clientName, int server);
 
 /**
- * Manda um Packet do TYPE_DOWNLOAD, depois fica pronto para receber uma stream TYPE_DATA usando a funcao download
+ * Manda um Packet do TYPE_DOWNLOAD
  * */
 void downloadCommand(int sockfd, char* path, char* clientName, int server);
 
+/*
+  Envia um packet do TYPE_DELETE
+*/
 void deleteCommand(int sockfd,char *path, char *clientName);
 
+/*
+  Deleta o arquivo
+*/
 void delete(int sockfd, char* fileName, char* pathUser);
 
+/*
+  Envia um packet do TYPE_LIST_SERVER
+*/
 void list_serverCommand(int sockfd, char *clientName);
 
+/*
+  Lista os arquivos se for cliente, se for servidor, envia a lista de arquivos
+*/
 void list_files(int sockfd,char *pathToUser, int server);
 
+/*
+  Lista os arquivos
+*/
 void list_clientCommand(int sockfd, char *clientName);
 
+/*
+  Manda um packet falando que um arquivo apareceu na pasta e está pronto para upload
+*/
 void inotifyUpCommand(int sockfd, char* path, char* clientName, int server);
 
 /*
@@ -164,3 +182,12 @@ void readyToSyncDir(int sockfd, char* clientName);
  Recebe FileNames de uma pasta e faz o upload de cada uma
 */
 void uploadAll(int sockfd,char *pathToUser);
+
+/*
+  Envia um packet falando que um arquivo foi deletado na pasta do cliente
+*/
+void inotifyDelCommand(int sockfd, char *path, char *clientName);
+
+
+
+#endif
