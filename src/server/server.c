@@ -119,7 +119,7 @@ void *handleConnection(void *socketDescriptor) {
             case TYPE_INOTIFY:
                 readyToDownload(newsockfd,incomingPacket.fileName,incomingPacket.clientName);
                 download(newsockfd,incomingPacket.fileName,incomingPacket.clientName,TRUE);
-                inotifyConfirmation(newsockfd,incomingPacket.fileName,pathServerUsers);
+                
                 if(findNode(userName, clientList, &client_node)){
                     otherSocket = otherSocketDevice(incomingPacket.clientName, newsockfd);
                     if(otherSocket != -1){
@@ -132,6 +132,7 @@ void *handleConnection(void *socketDescriptor) {
                 else{
                     //cliente nem esta na lista
                 }
+                inotifyConfirmation(newsockfd,incomingPacket.fileName,pathServerUsers);
                 break;
             case TYPE_DOWNLOAD:
                 readyToUpload(newsockfd,incomingPacket.fileName,incomingPacket.clientName);
@@ -139,7 +140,7 @@ void *handleConnection(void *socketDescriptor) {
                 break;
             case TYPE_INOTIFY_DELETE:
                 delete(newsockfd,incomingPacket.fileName, pathServerUsers);
-                inotifyConfirmation(newsockfd,incomingPacket.fileName,pathServerUsers);
+                
                 if(findNode(userName, clientList, &client_node)){
                     otherSocket = otherSocketDevice(incomingPacket.clientName, newsockfd);
                     if(otherSocket != -1){
@@ -152,6 +153,7 @@ void *handleConnection(void *socketDescriptor) {
                 else{
                     //cliente nem esta na lista
                 }
+                inotifyConfirmation(newsockfd,incomingPacket.fileName,pathServerUsers);
                 break;
             case TYPE_DELETE:
                 delete(newsockfd,incomingPacket.fileName, pathServerUsers);

@@ -5,9 +5,6 @@
 #define MAXFILES 20
 #define FREEDEV -1
 
-#define EVENT_SIZE  ( sizeof (struct inotify_event) )
-#define BUF_LEN     ( 1024 * ( EVENT_SIZE + 16 ) )
-
 
 #define INSERTDEVICE 0
 #define REMOVEDEVICE 1
