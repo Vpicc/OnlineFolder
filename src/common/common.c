@@ -12,6 +12,10 @@
 #include <sys/inotify.h>
 #include <dirent.h>
 #include <time.h>
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+
 #include "../../include/common/common.h"
 
 void serializePacket(packet* inPacket, char* serialized) {
@@ -873,5 +877,53 @@ void inotifyConfirmation(int sockfd, char *path, char *clientName) {
         printf("ERROR writing to socket\n");
 }
 
+void myIp(char* wantedIP, char* ip){
+    int fd;
+    struct ifreq ifr;
+
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    /* I want to get an IPv4 IP address */
+    ifr.ifr_addr.sa_family = AF_INET;
+
+    /* I want IP address attached to "eth0" */
+    strncpy(ifr.ifr_name, wantedIP, IFNAMSIZ-1);
+
+    ioctl(fd, SIOCGIFADDR, &ifr);
+
+    close(fd);
+
+    strcpy(ip, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr) );
+}
+int connectToServerTest(char* serverIp, char* serverPort) {
+    struct hostent *server;
+    struct sockaddr_in serv_addr;
+    int sockfd;
+    
+    server = gethostbyname(serverIp);
+
+	if (server == NULL) {
+        fprintf(stderr,"ERROR, no such host\n");
+        exit(-1);
+    }
+    
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        printf("ERROR opening socket\n");
+        exit(-1);
+    }
+    
+	serv_addr.sin_family = AF_INET;     
+	serv_addr.sin_port = htons(atoi(serverPort));
+    serv_addr.sin_addr = *((struct in_addr *)server->h_addr_list[0]);
+	bzero(&(serv_addr.sin_zero), 8);
+
+    
+	if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
+        printf("ERROR connecting\n");
+        exit(-1);
+    }
+
+    return sockfd;
+}
 
 

@@ -14,6 +14,7 @@
 #include "../../include/common/common.h"
 #include "../../include/linkedlist/linkedlist.h"
 
+pthread_mutex_t clientInitMutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *handleConnection(void *socketDescriptor) {
     packet incomingPacket;
@@ -47,7 +48,7 @@ void *handleConnection(void *socketDescriptor) {
     strcat(pathServerUsers,buffer);
 
     struct clientList *client_node = malloc(sizeof(*client_node));//node used to find the username on the list.
-
+    pthread_mutex_lock(&clientInitMutex);
     if (!findNode(buffer, clientList, &client_node)){
         appendNewClient(newsockfd, buffer, clientIp);
         checkAndCreateDir(pathServerUsers);
@@ -67,6 +68,10 @@ void *handleConnection(void *socketDescriptor) {
             write(newsockfd, auth, PACKET_SIZE);
         }
     }
+    pthread_mutex_unlock(&clientInitMutex);
+
+    /********************************/
+    // MANDA IP DO NOVO CLIENTE PROS SERVIDORES SECUNDARIOS
 
     /********************************************/
 	while(exitCommand == FALSE) {
@@ -121,7 +126,9 @@ void *handleConnection(void *socketDescriptor) {
                 }
                 else{
                     //cliente nem esta na lista
-}
+                }
+                // mandar pra todos os servers
+                // for de servers -> mirrorUploadCommand
                 break;
             case TYPE_INOTIFY:
                 readyToDownload(newsockfd,incomingPacket.fileName,incomingPacket.clientName);
@@ -139,6 +146,8 @@ void *handleConnection(void *socketDescriptor) {
                 else{
                     //cliente nem esta na lista
                 }
+                // mandar pra todos os servers
+                // for de servers -> mirrorUploadCommand
                 break;
             case TYPE_DOWNLOAD:
                 readyToUpload(newsockfd,incomingPacket.fileName,incomingPacket.clientName);
@@ -159,6 +168,8 @@ void *handleConnection(void *socketDescriptor) {
                 else{
                     //cliente nem esta na lista
                 }
+                // mandar pra todos os servers
+                // for de servers -> inotifyDelCommand
                 break;
             case TYPE_DELETE:
                 delete(newsockfd,incomingPacket.fileName, pathServerUsers);
@@ -175,6 +186,7 @@ void *handleConnection(void *socketDescriptor) {
                 else{
                     //cliente nem esta na lista
                 }
+                // for de servers -> inotifyDelCommand
                 break;
             case TYPE_LIST_SERVER:
                 readyToListServer(newsockfd);
@@ -285,4 +297,63 @@ int otherSocketDevice (char *userName, int actSocket) {
         return -1;
     }
 
+}
+
+void *createServerPrimary(){
+
+    int sockfd, newsockfd;
+    socklen_t clilen;
+    struct sockaddr_in serv_addr, cli_addr;
+    //pthread_t thread_id;
+
+    printf("Opening Socket...\n");
+    //socket para conexão de replicas
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+		fprintf(stderr,"ERROR opening socket.\n");
+		exit(-1);
+	}
+	
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(SERVERPORT);
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	bzero(&(serv_addr.sin_zero), 8);    
+
+	printf("Binding Socket... -- PRIMARY SERVER\n");
+
+	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+		fprintf(stderr,"ERROR on binding.\n");
+		exit(-1);
+	}
+	
+	listen(sockfd, 5);
+	
+	clilen = sizeof(struct sockaddr_in);
+
+	printf("Accepting new connections... -- PRIMARY SERVER\n");
+
+	while ((newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen)) != -1) {
+		printf("Connection Accepted -- PRIMARY SERVER\n");
+
+        //get_sync_dir versao server
+        // read do request do cliente
+        // dai começa o get sync dir server
+
+
+		printf("Handler Assigned -- PRIMARY SERVER\n");
+
+	}
+		
+	close(sockfd);
+	return 0; 
+}
+
+
+
+void copyIp(char *token,char *ipToken) {
+    int i = 0;
+    while((char) *(token + i) != ';') {
+        ipToken[i] = (char) *(token + i);
+        i++;
+    }
+    ipToken[i] = '\0';
 }

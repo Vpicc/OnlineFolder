@@ -12,6 +12,8 @@
 
 #define RECONNECTION_PORT 4070
 
+#define SERVERPORT 4010
+
 #define ERRORCODE -1
 
 #define SUCCESS 0
@@ -64,6 +66,8 @@
 #define TYPE_INOTIFY_DELETE 75
 
 #define PACKET_SIZE (sizeof (struct packet))
+
+#define WANTED_IP "enp3s0"
 
 
 typedef struct packet {
@@ -206,6 +210,13 @@ void mirrorUploadCommand(int sockfd, char *path, char *clientName);
   Confirma que o servidor fez a ação do inotify
 */
 void inotifyConfirmation(int sockfd, char *path, char *clientName);
-
+/*
+  Retorna no buffer 'ip' o IP desejado ("eth0"....).
+*/
+void myIp(char* wantedIP, char* ip);
+/*
+  Connect to server -- retorna socket
+*/
+int connectToServerTest(char* serverIp, char* serverPort);
 
 #endif

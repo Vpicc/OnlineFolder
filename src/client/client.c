@@ -617,17 +617,17 @@ void *serverReconnection() {
 	close(sockfd);
     return NULL;
 }
-
+/*
 void myIp(char* wantedIP, char* ip){
     int fd;
     struct ifreq ifr;
 
     fd = socket(AF_INET, SOCK_DGRAM, 0);
 
-    /* I want to get an IPv4 IP address */
+   // I want to get an IPv4 IP address 
     ifr.ifr_addr.sa_family = AF_INET;
 
-    /* I want IP address attached to "eth0" */
+    // I want IP address attached to "eth0" 
     strncpy(ifr.ifr_name, wantedIP, IFNAMSIZ-1);
 
     ioctl(fd, SIOCGIFADDR, &ifr);
@@ -636,4 +636,4 @@ void myIp(char* wantedIP, char* ip){
 
     strcpy(ip, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr) );
 }
-
+*/

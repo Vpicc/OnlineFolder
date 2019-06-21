@@ -17,6 +17,8 @@
 #define DOWNLOADALL 5
 #define EXIT 4
 
+#define TRUE 1
+#define FALSE 0
 
 void createList(struct clientList *clientList); //Cria a lista
 /*
@@ -31,5 +33,27 @@ int isEmpty(struct clientList *clientList);
 Encontra um cliente na lista apartir do username do mesmo. Retorna 0 caso não encontre o clinte 
 */
 int findNode(char *userName, struct clientList *clientList, struct clientList **client);
+//insere servidor em uma lista encadeada
+void insertServerList(struct serverList **serverList, char *name, int port);
+//inicia a lista encadeada de servidores
+void createServerList(struct serverList *serverList);
+//1 se é servidor primario, 0 se nao
+int isPrimary(char *serverName, int port, struct serverList **serverList);
+/*
+Retona servername anterior na lista
+*/
+struct serverList *previousServer(char *serverName,int myPORT, struct serverList **serverList);
+/*
+ Acha servidor na lista
+ */
+struct serverList *findServer(char *serverName, int port, struct serverList **serverList);
+/*
+Retona servername do primario
+*/
+struct serverList *primaryServer(struct serverList **serverList);
 
+/* Remove servidor da lista de servidores */
+int removeFromServerList(struct serverList **serverList, char* primaryServerIp, int primaryServerPort);
+/* Define servidor como primario */
+int setPrimary(int serverID, struct serverList **serverList);
 #endif

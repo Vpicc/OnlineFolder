@@ -13,7 +13,8 @@ client:
 
 server:
 	$(CC) -c $(SRC_DIR)/server/server.c -o $(BIN_DIR)/server.o -Wall -g
-	$(CC) -o $(EXEC_DIR)/server/server $(SRC_DIR)/server/main.c $(BIN_DIR)/server.o $(BIN_DIR)/common.o $(BIN_DIR)/linkedlist.o -g -Wall -lpthread -O0
+	$(CC) -c $(SRC_DIR)/server/secondary.c -o $(BIN_DIR)/secondary.o -Wall -g
+	$(CC) -o $(EXEC_DIR)/server/server $(SRC_DIR)/server/main.c $(BIN_DIR)/server.o $(BIN_DIR)/secondary.o $(BIN_DIR)/common.o $(BIN_DIR)/linkedlist.o -g -Wall -lpthread -O0
 
 common:
 	$(CC) -c $(SRC_DIR)/common/common.c -o $(BIN_DIR)/common.o -Wall -g

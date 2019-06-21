@@ -6,6 +6,7 @@
         "socket.h": "c",
         "common.h": "c",
         "linkedlist.h": "c",
-        "client.h": "c"
+        "client.h": "c",
+        "secondary.h": "c"
     },
 }

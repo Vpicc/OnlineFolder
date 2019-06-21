@@ -17,6 +17,8 @@
 
 struct clientList *clientList; //Inicialização do nodo inicial da lista de clientes
 
+struct serverList *serverList;
+
 /*
   Função que escuta a nova conexão de cliente e faz dispatch dos comandos de acordo com o packet recebido
 */
@@ -35,6 +37,13 @@ int updateNumberOfDevices(struct clientList *client_node, int socketNumber, int 
   Procura um segundo socket associado a um cliente
 */
 int otherSocketDevice (char *userName, int actSocket);
+/*
+  Cria servidor primario-- retorna socket
+*/
+void *createServerPrimary();
+
+void copyIp(char *token,char *ipToken);
+
 
 struct client
 {
@@ -48,6 +57,16 @@ struct clientList
 {
   struct client client;
   struct clientList *next;
+};
+
+struct serverList
+{
+  char serverName[MAXNAME];
+  int port;
+  int id;
+  int isPrimary;
+  struct serverList *next;
+  struct serverList *previous;
 };
 
 #endif

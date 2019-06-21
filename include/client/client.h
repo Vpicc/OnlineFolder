@@ -18,7 +18,6 @@
 
 #define SERVER_IP_SIZE 64
 #define SERVER_PORT_SIZE 12
-#define WANTED_IP "wlx54e6fc8fe2f1"
 
 
 extern pthread_mutex_t clientMutex;
