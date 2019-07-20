@@ -86,7 +86,7 @@ void deserializePacket(packet* outPacket, char* serialized) {
     return;
 }
 
-void uploadCommand(int sockfd, char* path, char* clientName, int server) {
+int uploadCommand(int sockfd, char* path, char* clientName, int server) {
     int status;
     int fileSize;
     int i = 0;
@@ -121,7 +121,7 @@ void uploadCommand(int sockfd, char* path, char* clientName, int server) {
     fp = fopen(finalPath,"r");
     if(fp == NULL) {
         printf("ERROR Could not read file.\n");
-        return;
+        return ERRORCODE;
     }
     fseek(fp,0,SEEK_END);
     fileSize = ftell(fp);
@@ -142,8 +142,10 @@ void uploadCommand(int sockfd, char* path, char* clientName, int server) {
     /* write in the socket */
 
     status = write(sockfd, serialized, PACKET_SIZE);
-    if (status < 0) 
+    if (status < 0){
         printf("ERROR writing to socket\n");
+        return ERRORCODE;
+    }
 
 
     //bzero(response, PAYLOAD_SIZE);
@@ -161,11 +163,13 @@ void uploadCommand(int sockfd, char* path, char* clientName, int server) {
     
     free(finalPath);
     
+    return SUCCESS;
 }
 
 void upload(int sockfd, char* path, char* clientName, int server) {
     uint16_t nread = 0;
     char buffer[PAYLOAD_SIZE] = {0};
+    char okBuf[3] = {0};
     uint32_t totalSize;
     int fileSize;
     FILE *fp;
@@ -173,7 +177,6 @@ void upload(int sockfd, char* path, char* clientName, int server) {
     char* fileName;
     char* finalPath = malloc(strlen(path) + strlen(clientName) + 11);
     char serialized[PACKET_SIZE];
-    //char response[PAYLOAD_SIZE];
     packet packetToUpload;
     int i = 0;
 
@@ -198,7 +201,7 @@ void upload(int sockfd, char* path, char* clientName, int server) {
         strncpy(finalPath, path, strlen(path) + 1);
     }
 
-    fp = fopen(finalPath,"r");
+    fp = fopen(finalPath,"rb");
     if(fp == NULL) {
         printf("ERROR Could not read file.\n");
         return;
@@ -226,36 +229,30 @@ void upload(int sockfd, char* path, char* clientName, int server) {
             return;
         }
     } else {
-        while ((nread = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
+        while ((nread = fread(buffer, 1, PAYLOAD_SIZE, fp)) > 0) {
             memset(serialized, '\0', sizeof(serialized));
 
             packetToUpload.type = TYPE_DATA;
             packetToUpload.seqn = i;
             packetToUpload.length = nread;
 
-            strncpy(packetToUpload._payload, buffer, PAYLOAD_SIZE);
+            memcpy(packetToUpload._payload, buffer, PAYLOAD_SIZE);
+
+            printf("\nPACKET UPLOAD:%u %u %u %u %s %s %s\n",packetToUpload.type, packetToUpload.seqn,packetToUpload.length, packetToUpload.total_size, packetToUpload.clientName, packetToUpload.fileName, packetToUpload._payload);
+
 
             serializePacket(&packetToUpload, serialized);
 
-            status = write(sockfd, serialized, PACKET_SIZE);
+            //do {
+                status = write(sockfd, serialized, PACKET_SIZE);
+                printf("\nStatus: %d\n",status);
+
+            //} while(!(status < PACKET_SIZE && status != 0));
 
             if(status < 0) {
                 printf("ERROR writing to socket\n");
                 return;
             }
-
-            //bzero(response, PAYLOAD_SIZE);
-
-            /* read from the socket */
-            /*
-            status = read(sockfd, response, PAYLOAD_SIZE);
-            if(status < 0) {
-                printf("ERROR reading from socket\n");
-                return;
-            }
-
-            printf("%s\n", response);
-            */
             i++;
         }
     }
@@ -266,6 +263,7 @@ void upload(int sockfd, char* path, char* clientName, int server) {
 
 void download(int sockfd, char* fileName, char* clientName, int server) {
     int status;
+    int errorFlag;
     char *path;
     char serialized[PACKET_SIZE];
     FILE *fp;
@@ -277,9 +275,9 @@ void download(int sockfd, char* fileName, char* clientName, int server) {
         strcat(path,clientName);
         strcat(path,"/");
         strcat(path,fileName);
-        fp = fopen(path,"w");
+        fp = fopen(path,"wb");
     } else {
-        fp = fopen(fileName,"w");
+        fp = fopen(fileName,"wb");
     }
     if(fp == NULL) {
         printf("ERROR Writing to file");
@@ -287,22 +285,29 @@ void download(int sockfd, char* fileName, char* clientName, int server) {
     }
 
     do {
-        status = read(sockfd, serialized, PACKET_SIZE);
+        errorFlag = FALSE;
+        //do{
+            status = read(sockfd, serialized, PACKET_SIZE);
+        //} while(!(status < PACKET_SIZE && status != 0));
         if (status <= 0) {
             printf("ERROR reading from socket\n");
             return;
-        }
+        } 
 
         deserializePacket(&packetToDownload,serialized);
+        printf("\nPACKET DOWNLOAD:%u %u %u %u %s %s %s\n",packetToDownload.type, packetToDownload.seqn,packetToDownload.length, packetToDownload.total_size, packetToDownload.clientName, packetToDownload.fileName, packetToDownload._payload);
 
         if(packetToDownload.type == TYPE_DATA) {
             fwrite(packetToDownload._payload,1,packetToDownload.length,fp);
         } else {
             printf("\nERROR expected Packet Type Data, Packet that came instead: %u\n", packetToDownload.type);
+            errorFlag = TRUE;
         }
 
+        status = write(sockfd,"OK",3);
 
-    } while(packetToDownload.seqn < packetToDownload.total_size);
+
+    } while(packetToDownload.seqn < packetToDownload.total_size || errorFlag);
 
     if(server) {
         free(path);
@@ -312,7 +317,7 @@ void download(int sockfd, char* fileName, char* clientName, int server) {
 
 }
 
-void downloadCommand(int sockfd, char* path, char* clientName, int server) {
+int downloadCommand(int sockfd, char* path, char* clientName, int server) {
     char* fileName;
     packet packetToDownload;
     char buffer[PAYLOAD_SIZE] = {0};
@@ -341,28 +346,20 @@ void downloadCommand(int sockfd, char* path, char* clientName, int server) {
     /* write in the socket */
 
     status = write(sockfd, serialized, PACKET_SIZE);
-    if (status < 0) 
+    if (status < 0) {
         printf("ERROR writing to socket\n");
-
-    //bzero(response, PAYLOAD_SIZE);
-    
-    /* read from the socket */
-    /*status = read(sockfd, response, PAYLOAD_SIZE);
-    if (status < 0) 
-        printf("ERROR reading from socket\n");
-
-    printf("%s\n",response);*/
-
-    //download(sockfd,packetToDownload.fileName,packetToDownload.clientName,FALSE);
-
+        return ERRORCODE;
+    }
+    return SUCCESS;
 }
 
 int checkAndCreateDir(char *pathName){
     struct stat sb;
+    //char synDir[9] = "_sync_dir";
     //printf("%s",strcat(pathcomplete, userName));
     if (stat(pathName, &sb) == 0 && S_ISDIR(sb.st_mode)){
         // usuário já tem o diretório com o seu nome
-        return 0;
+        return SUCCESS;
     }
     else{
         if (mkdir(pathName, 0777) < 0){
@@ -372,12 +369,12 @@ int checkAndCreateDir(char *pathName){
         // diretório não existe
         else{
             printf("Creating %s directory...\n", pathName);
-            return 0;
+            return SUCCESS;
         }
     }
 }
 
-void deleteCommand(int sockfd, char *path, char *clientName){
+int deleteCommand(int sockfd, char *path, char *clientName){
     
     char* fileName;
     char serialized[PACKET_SIZE];
@@ -394,8 +391,11 @@ void deleteCommand(int sockfd, char *path, char *clientName){
     /* write in the socket */
 
     status = write(sockfd, serialized, PACKET_SIZE);
-    if (status < 0) 
+    if (status < 0){
         printf("ERROR writing to socket\n");
+        return ERRORCODE;
+    }
+        
 
     
     /* captura o executing command */
@@ -410,6 +410,7 @@ void deleteCommand(int sockfd, char *path, char *clientName){
     if (status < 0) 
         printf("ERROR reading from socket\n");
     printf("%s", response);*/
+    return SUCCESS;
 
 }
 
@@ -461,7 +462,7 @@ void delete(int sockfd, char* fileName, char* pathUser){
 
 }
 
-void list_serverCommand(int sockfd, char *clientName){
+int list_serverCommand(int sockfd, char *clientName){
   
     char serialized[PACKET_SIZE];
     packet packetToListServer;
@@ -476,8 +477,10 @@ void list_serverCommand(int sockfd, char *clientName){
     /* write in the socket */
 
     status = write(sockfd, serialized, PACKET_SIZE);
-    if (status < 0) 
+    if (status < 0){
         printf("ERROR writing to socket\n");
+        return ERRORCODE;
+    }
 
 /*
     do{
@@ -490,6 +493,7 @@ void list_serverCommand(int sockfd, char *clientName){
         fprintf(stderr,"%s",response);
     } while (strcmp(response,"  ") != 0);
 */
+return SUCCESS;
 }
 char* pathToFile(char* pathUser, char* fileName) {
     char* pathToFile;
@@ -543,9 +547,11 @@ void list_files(int sockfd,char *pathToUser, int server){
             printf("ERROR writing to socket\n");
     }
 }
-void list_clientCommand(int sockfd, char *clientName){
+int list_clientCommand(int sockfd, char *clientName){
 
     list_files(sockfd,clientName,FALSE);
+
+    return SUCCESS;
 
 }
 
@@ -598,7 +604,7 @@ void readyToListServer(int sockfd) {
     }
 }
 
-void getSyncDirCommand(int sockfd, char* clientName) {
+int getSyncDirCommand(int sockfd, char* clientName) {
     packet outPacket;
     int status;
     char serialized[PACKET_SIZE];
@@ -609,8 +615,10 @@ void getSyncDirCommand(int sockfd, char* clientName) {
 
     if (status < 0) {
         printf("ERROR writing to socket\n");
-        return;
+        return ERRORCODE;
     }
+
+    return SUCCESS;
 }
 
 

@@ -13,7 +13,7 @@
 #include <sys/inotify.h>
 #include "../../include/common/common.h"
 #include "../../include/linkedlist/linkedlist.h"
-
+char synDir[9] = "_sync_dir";
 
 void *handleConnection(void *socketDescriptor) {
     packet incomingPacket;
@@ -26,9 +26,7 @@ void *handleConnection(void *socketDescriptor) {
     char pathServerUsers[CLIENT_NAME_SIZE] = "";
     char auth[PACKET_SIZE] = {0};
     int otherSocket;
-
-
-
+    
 
     /*************************************/
     //Reads the client name and update/search on the client list.
@@ -37,6 +35,8 @@ void *handleConnection(void *socketDescriptor) {
     if(idUserName < 0)
         printf("ERROR reading from socket");
     strcpy(userName , buffer);
+    /*strcat(userName, synDir);
+    strcat(pathServerUsers, synDir);*/
     strcat(pathServerUsers,buffer);
 
     struct clientList *client_node = malloc(sizeof(*client_node));//node used to find the username on the list.

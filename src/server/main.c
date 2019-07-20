@@ -11,7 +11,7 @@
 #include <errno.h>
 #include "../../include/common/common.h"
 #include "../../include/linkedlist/linkedlist.h"
-
+	
 
 int main(int argc, char *argv[])
 {
@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 	}
 	
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(PORT);
+	serv_addr.sin_port = htons(atoi(argv[1]));
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	bzero(&(serv_addr.sin_zero), 8);
 

@@ -14,14 +14,19 @@
 #include <errno.h>
 #include <sys/inotify.h>
 #include <semaphore.h>
+#define MAXNAME 64
 #include "../../include/common/common.h"
 
 extern pthread_mutex_t clientMutex;
 
-extern sem_t inotifySemaphore; 
+extern pthread_mutex_t writeListenMutex;
+
+extern sem_t inotifySemaphore;
+
+extern sem_t writerSemaphore;
 
 struct inotyClient{
-  char userName[64];
+  char userName[MAXNAME];
   int socket;
 };
 

@@ -10,6 +10,10 @@
 
 #define PORT 4000
 
+#define ERRORCODE -1
+
+#define SUCCESS 0
+
 #define TRUE 1
 
 #define FALSE 0
@@ -87,7 +91,7 @@ void upload(int sockfd, char* path, char* clientName, int server);
 /**
  * Manda um Packet do TYPE_UPLOAD
  * */
-void uploadCommand(int sockfd, char* path, char* clientName, int server);
+int uploadCommand(int sockfd, char* path, char* clientName, int server);
 
 /**
  * Faz o download de uma stream de TYPE_DATA
@@ -97,12 +101,12 @@ void download(int sockfd, char* fileName, char* clientName, int server);
 /**
  * Manda um Packet do TYPE_DOWNLOAD
  * */
-void downloadCommand(int sockfd, char* path, char* clientName, int server);
+int downloadCommand(int sockfd, char* path, char* clientName, int server);
 
 /*
   Envia um packet do TYPE_DELETE
 */
-void deleteCommand(int sockfd,char *path, char *clientName);
+int deleteCommand(int sockfd,char *path, char *clientName);
 
 /*
   Deleta o arquivo
@@ -112,7 +116,7 @@ void delete(int sockfd, char* fileName, char* pathUser);
 /*
   Envia um packet do TYPE_LIST_SERVER
 */
-void list_serverCommand(int sockfd, char *clientName);
+int list_serverCommand(int sockfd, char *clientName);
 
 /*
   Lista os arquivos se for cliente, se for servidor, envia a lista de arquivos
@@ -122,7 +126,7 @@ void list_files(int sockfd,char *pathToUser, int server);
 /*
   Lista os arquivos
 */
-void list_clientCommand(int sockfd, char *clientName);
+int list_clientCommand(int sockfd, char *clientName);
 
 /*
   Manda um packet falando que um arquivo apareceu na pasta e está pronto para upload
@@ -132,7 +136,7 @@ void inotifyUpCommand(int sockfd, char* path, char* clientName, int server);
 /*
   Packet do TYPE_GET_SYNC_DIR
 */
-void getSyncDirCommand(int sockfd, char* clientName);
+int getSyncDirCommand(int sockfd, char* clientName);
 
 /*
   Lança uma thread para ficar no watcher no path de argumento

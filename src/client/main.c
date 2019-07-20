@@ -14,8 +14,11 @@
 
 
 pthread_mutex_t clientMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t writeListenMutex = PTHREAD_MUTEX_INITIALIZER;
 
 int inotifyInitialized = FALSE;
+
+sem_t writerSemaphore;
 
 int main(int argc, char *argv[])
 {
@@ -31,7 +34,14 @@ int main(int argc, char *argv[])
     struct hostent *server;
     int idUserName;
     char *fileName;
+    int error;
     pthread_t thread_id, thread_id2;
+    
+    char synDir[11] = "_sync_dir";
+    char userName[MAXNAME];
+    bzero(userName, MAXNAME);
+    strcpy(userName, argv[1]);
+    strcat(userName, synDir);
 
     bzero(command,PAYLOAD_SIZE);
 
@@ -51,9 +61,8 @@ int main(int argc, char *argv[])
         printf("ERROR opening socket\n");
         exit(-1);
     }
-    
 	serv_addr.sin_family = AF_INET;     
-	serv_addr.sin_port = htons(PORT);
+	serv_addr.sin_port = htons(atoi(argv[3]));
     serv_addr.sin_addr = *((struct in_addr *)server->h_addr_list[0]);
 	bzero(&(serv_addr.sin_zero), 8);
 
@@ -67,7 +76,7 @@ int main(int argc, char *argv[])
     semInit();
 
 
-    sprintf(buffer,"%s",argv[1]);
+    sprintf(buffer,"%s",userName);
     idUserName = write(sockfd, buffer, PAYLOAD_SIZE);
     // envia o username para o servidor
     if (idUserName < 0) 
@@ -77,14 +86,14 @@ int main(int argc, char *argv[])
     */
     struct inotyClient *inotyClient = malloc(sizeof(*inotyClient));
     inotyClient->socket = sockfd;
-    strcpy(inotyClient->userName, argv[1]);
+    strcpy(inotyClient->userName, userName);
     while(authorization == WAITING){
         read(sockfd, response, PACKET_SIZE);
         if(strcmp(response,"authorized") == 0){
             // get_sync_dir
-            checkAndCreateDir(argv[1]);
-            deleteAll(argv[1]);
-            synchronize(sockfd,argv[1]);
+            checkAndCreateDir(userName);
+            deleteAll(userName);
+            synchronize(sockfd,userName);
             //
             if(pthread_create(&thread_id, NULL, inotifyWatcher, (void *) inotyClient) < 0){ // Inotify
 			    fprintf(stderr,"ERROR, could not create thread.\n");
@@ -104,10 +113,10 @@ int main(int argc, char *argv[])
         }
     }
 
+    printf("\nConsole Started, you can now enter commands.\n");
 
     while (exitCommand == FALSE) {
 
-        printf("\nEnter the Command: ");
         bzero(command, PAYLOAD_SIZE);
         fgets(command, PAYLOAD_SIZE, stdin);
         if(strcspn(command, "\n")>0)
@@ -128,6 +137,8 @@ int main(int argc, char *argv[])
         }
         
         pthread_mutex_lock(&clientMutex);
+        pthread_mutex_lock(&writeListenMutex);
+
         // Switch for options
         if(strcmp(option,"exit") == 0) {
             exitCommand = TRUE;
@@ -140,11 +151,11 @@ int main(int argc, char *argv[])
                 fileName = path;
             }
             strcpy(lastFile, fileName);
-            uploadCommand(sockfd,path,argv[1], FALSE);          
+            error = uploadCommand(sockfd,path,userName, FALSE);          
         } else if (strcmp(option, "download") == 0) { // download to exec folder
-            downloadCommand(sockfd,path,argv[1], FALSE);
+            error = downloadCommand(sockfd,path,userName, FALSE);
         } else if (strcmp(option, "delete") == 0) { // delete from syncd dir
-        fileName = strrchr(path,'/');
+            fileName = strrchr(path,'/');
             if(fileName != NULL){
                 fileName++;
             } 
@@ -152,16 +163,24 @@ int main(int argc, char *argv[])
                 fileName = path;
             }
             strcpy(lastFile, fileName);
-            deleteCommand(sockfd,path,argv[1]);
+            error = deleteCommand(sockfd,path,userName);
         } else if (strcmp(option, "list_server") == 0) { // list user's saved files on dir
-            list_serverCommand(sockfd,argv[1]);
+            error = list_serverCommand(sockfd,userName);
         } else if (strcmp(option, "list_client") == 0) { // list saved files on dir
-            list_clientCommand(sockfd,argv[1]);
+            error = list_clientCommand(sockfd,userName);
         } else if (strcmp(option, "get_sync_dir") == 0) { // creates sync_dir_<username> and syncs
-            checkAndCreateDir(argv[1]);
-            getSyncDirCommand(sockfd,argv[1]);            
+            error = checkAndCreateDir(userName);
+            error = getSyncDirCommand(sockfd,userName);            
+        } else {
+            printf("\nInvalid Command.\n");
         }
         pthread_mutex_unlock(&clientMutex);
+        if((strcmp(option, "list_client") != 0 && error != ERRORCODE)){
+            sem_wait(&writerSemaphore);
+        }else{
+            pthread_mutex_unlock(&writeListenMutex);
+        }
+
     }
 
 	close(sockfd);

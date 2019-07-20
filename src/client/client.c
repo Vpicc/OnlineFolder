@@ -51,27 +51,37 @@ void *listener(void *socket){
         pthread_mutex_lock(&clientMutex);
         switch(incomingPacket.type) {
                 case TYPE_UPLOAD:
+                    printf("\nDownloading %s...\n", incomingPacket.fileName);
                     download(connectionSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                    printf("\n%s Downloaded.\n", incomingPacket.fileName);
                     bzero(lastFile,FILENAME_SIZE);
                     break;
                 case TYPE_INOTIFY:
+                    printf("\nDownloading %s...\n", incomingPacket.fileName);
                     download(connectionSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                    printf("\n%s Downloaded.\n", incomingPacket.fileName);
                     bzero(lastFile,FILENAME_SIZE);                    
                     break;
                 case TYPE_DELETE:
+                    printf("\nDeleting %s...\n", incomingPacket.fileName);
                     delete(connectionSocket,incomingPacket.fileName, incomingPacket.clientName);
                     bzero(lastFile,FILENAME_SIZE);                    
                     break;
                 case TYPE_INOTIFY_DELETE:
+                    printf("\nDeleting %s...\n", incomingPacket.fileName);
                     delete(connectionSocket,incomingPacket.fileName, incomingPacket.clientName);
                     bzero(lastFile,FILENAME_SIZE);                    
                     break;
                 case TYPE_DOWNLOAD_READY:
+                    printf("\nUploading %s...\n", incomingPacket.fileName);
                     upload(connectionSocket,clientPath,incomingPacket.clientName,FALSE);
+                    printf("\n%s Uploaded.\n", incomingPacket.fileName);
                     bzero(lastFile,FILENAME_SIZE);  
                     break;
                 case TYPE_UPLOAD_READY:
+                    printf("\nDownloading %s...\n", incomingPacket.fileName);
                     download(connectionSocket,incomingPacket.fileName,incomingPacket.clientName,FALSE);
+                    printf("\n%s Downloaded.\n", incomingPacket.fileName);
                     bzero(lastFile,FILENAME_SIZE);  
                     break;
                 case TYPE_LIST_SERVER_READY:
@@ -87,9 +97,15 @@ void *listener(void *socket){
                     break;
         }
         pthread_mutex_unlock(&clientMutex);
+        pthread_mutex_unlock(&writeListenMutex);
+
         sem_getvalue(&inotifySemaphore,&semStatus);
         if (semStatus == 0) {
             sem_post(&inotifySemaphore);
+        }
+        sem_getvalue(&writerSemaphore,&semStatus);
+        if (semStatus == 0) {
+            sem_post(&writerSemaphore);
         }
     }
 }
@@ -212,7 +228,8 @@ void *inotifyWatcher(void *inotifyClient){
         if ( length < 0 ) {
             perror( "read" );
         }
-        
+        pthread_mutex_lock(&writeListenMutex);
+
         if(!synching){   
             while ( i < length ) {
                 inotifyInAction = TRUE;
@@ -232,7 +249,7 @@ void *inotifyWatcher(void *inotifyClient){
                         }
                         else{
 
-                            printf("Não precisa ativar o Inotify\n");
+                            printf("\nNão precisa ativar o Inotify\n");
                             bzero(lastFile,FILENAME_SIZE);
                         }
                     } else if (event->mask & IN_MOVED_TO) {
@@ -244,7 +261,7 @@ void *inotifyWatcher(void *inotifyClient){
                         }
                         else{
 
-                            printf("Não precisa ativar o Inotify\n");
+                            printf("\nNão precisa ativar o Inotify\n");
                             bzero(lastFile,FILENAME_SIZE);
                         }
                     }
@@ -256,7 +273,7 @@ void *inotifyWatcher(void *inotifyClient){
                             //inotifyDelCommand(((struct inotyClient*) inotifyClient)->socket, ((struct inotyClient*) inotifyClient)->userName ,((struct inotyClient*) inotifyClient)->userName);        
                         }
                         else{
-                            printf("Não precisa ativar o Inotify\n");
+                            printf("\nNão precisa ativar o Inotify\n");
                             bzero(lastFile,FILENAME_SIZE);
                         }
                             
@@ -267,11 +284,13 @@ void *inotifyWatcher(void *inotifyClient){
                 sem_post(&listenerSemaphore);
 
             }
+            
         }
-        
+        pthread_mutex_unlock(&writeListenMutex);
         
 
     }
+
     ( void ) inotify_rm_watch( fd, wd );
     ( void ) close( fd );
 }
@@ -279,4 +298,5 @@ void *inotifyWatcher(void *inotifyClient){
 void semInit() {
     sem_init(&inotifySemaphore,0,1);
     sem_init(&listenerSemaphore,0,0);
+    sem_init(&writerSemaphore,0,0);
 }
