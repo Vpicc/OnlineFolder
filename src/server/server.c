@@ -92,6 +92,10 @@ void *handleConnection(void *socketDescriptor) {
         */
         
         deserializePacket(&incomingPacket,buffer);
+
+        if(findNode(userName, clientList, &client_node)){
+            pthread_mutex_lock(&(client_node->client.clientPairMutex));
+        }
         
         switch(incomingPacket.type) {
             case TYPE_UPLOAD:
@@ -102,8 +106,7 @@ void *handleConnection(void *socketDescriptor) {
                 if(findNode(userName, clientList, &client_node)){
                     otherSocket = otherSocketDevice(incomingPacket.clientName, newsockfd);
                     if(otherSocket != -1){
-                        uploadCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
-                        upload(otherSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                        mirrorUploadCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName);
                     }
                     else{
                         //nao tem outro device
@@ -116,11 +119,11 @@ void *handleConnection(void *socketDescriptor) {
             case TYPE_INOTIFY:
                 readyToDownload(newsockfd,incomingPacket.fileName,incomingPacket.clientName);
                 download(newsockfd,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                inotifyConfirmation(newsockfd,incomingPacket.fileName,pathServerUsers);
                 if(findNode(userName, clientList, &client_node)){
                     otherSocket = otherSocketDevice(incomingPacket.clientName, newsockfd);
                     if(otherSocket != -1){
-                        uploadCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
-                        upload(otherSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                        mirrorUploadCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName);
                     }
                     else{
                         //nao tem outro device
@@ -136,10 +139,11 @@ void *handleConnection(void *socketDescriptor) {
                 break;
             case TYPE_INOTIFY_DELETE:
                 delete(newsockfd,incomingPacket.fileName, pathServerUsers);
+                inotifyConfirmation(newsockfd,incomingPacket.fileName,pathServerUsers);
                 if(findNode(userName, clientList, &client_node)){
                     otherSocket = otherSocketDevice(incomingPacket.clientName, newsockfd);
                     if(otherSocket != -1){
-                        deleteCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName);
+                        inotifyDelCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName);
                     }
                     else{
                         //nao tem outro device
@@ -151,11 +155,11 @@ void *handleConnection(void *socketDescriptor) {
                 break;
             case TYPE_DELETE:
                 delete(newsockfd,incomingPacket.fileName, pathServerUsers);
-                deleteCommand(newsockfd,incomingPacket.fileName,incomingPacket.clientName);
+                inotifyDelCommand(newsockfd,incomingPacket.fileName,incomingPacket.clientName);
                 if(findNode(userName, clientList, &client_node)){
                     otherSocket = otherSocketDevice(incomingPacket.clientName, newsockfd);
                     if(otherSocket != -1){
-                        deleteCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName);
+                        inotifyDelCommand(otherSocket,incomingPacket.fileName,incomingPacket.clientName);
                     }
                     else{
                         //nao tem outro device
@@ -190,6 +194,9 @@ void *handleConnection(void *socketDescriptor) {
             default:
                 break;
         }
+        if(findNode(userName, clientList, &client_node)){
+            pthread_mutex_unlock(&(client_node->client.clientPairMutex));
+        }
     
     }
 
@@ -203,6 +210,7 @@ void appendNewClient(int socketNewClient, char* userName) {
     newClient->devices[0] = socketNewClient;
     newClient->devices[1] = -1;
     strcpy(newClient->userName , userName);
+    pthread_mutex_init(&(newClient->clientPairMutex), NULL);
     insertList(&clientList,*newClient);
 }
 

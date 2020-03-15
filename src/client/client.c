@@ -17,80 +17,90 @@
 #include "../../include/linkedlist/linkedlist.h"
 #include "../../include/client/client.h"
 
-int inotifyInAction = FALSE;
 
-sem_t inotifySemaphore;
-
-sem_t listenerSemaphore;
+pthread_mutex_t listenerInotifyMut = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t noListen = PTHREAD_COND_INITIALIZER, noInotify = PTHREAD_COND_INITIALIZER;
 
 int synching = FALSE;
 
+int inotifyLength = 0;
+int listenerStatus = 0;
+
 void *listener(void *socket){
-    int semStatus;
-    //char command[PAYLOAD_SIZE];
     char response[PACKET_SIZE];
-    int status;
     int connectionSocket = *(int*)socket;
     packet incomingPacket;
     bzero(response, PACKET_SIZE);
 
     while(1){
-        status = read(connectionSocket, response, PACKET_SIZE);
+        
+        listenerStatus = read(connectionSocket, response, PACKET_SIZE);
+        
         deserializePacket(&incomingPacket,response);
-        strcpy(lastFile,incomingPacket.fileName);
+        
 
-        if(status == 0) {
+        if(listenerStatus == 0) {
             printf("\nConnection Closed.\n");
             exit(-1);
         }
-
+        
+        pthread_mutex_lock(&listenerInotifyMut);
         //printf("PACKET: %u %u %u %u %s %s %s\n", incomingPacket.type,incomingPacket.seqn,incomingPacket.length,incomingPacket.total_size,incomingPacket.clientName,incomingPacket.fileName,incomingPacket._payload);
-        if(inotifyInAction) {
-            sem_wait(&listenerSemaphore);
+        while(inotifyLength) {
+            pthread_cond_wait(&noListen, &listenerInotifyMut);
         }
+        listenerStatus = 0;
         pthread_mutex_lock(&clientMutex);
         switch(incomingPacket.type) {
                 case TYPE_UPLOAD:
+                    printf("\nDownloading %s...\n", incomingPacket.fileName);
                     download(connectionSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
-                    bzero(lastFile,FILENAME_SIZE);
+                    printf("\n%s Downloaded.\n", incomingPacket.fileName);
                     break;
-                case TYPE_INOTIFY:
-                    download(connectionSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
-                    bzero(lastFile,FILENAME_SIZE);                    
-                    break;
-                case TYPE_DELETE:
-                    delete(connectionSocket,incomingPacket.fileName, incomingPacket.clientName);
-                    bzero(lastFile,FILENAME_SIZE);                    
+                case TYPE_MIRROR_UPLOAD:
+                    strcpy(lastFile,incomingPacket.fileName);
+                    downloadCommand(connectionSocket,incomingPacket.fileName,incomingPacket.clientName,FALSE);
+                    read(connectionSocket, response, PACKET_SIZE);
+                    deserializePacket(&incomingPacket,response);
+                    if(incomingPacket.type == TYPE_UPLOAD_READY){
+                        printf("\nDownloading %s...\n", incomingPacket.fileName);
+                        download(connectionSocket,incomingPacket.fileName,incomingPacket.clientName,TRUE);
+                        printf("\n%s Downloaded.\n", incomingPacket.fileName);
+                    }
                     break;
                 case TYPE_INOTIFY_DELETE:
-                    delete(connectionSocket,incomingPacket.fileName, incomingPacket.clientName);
-                    bzero(lastFile,FILENAME_SIZE);                    
+                    strcpy(lastFile,incomingPacket.fileName);
+                    printf("\nDeleting %s...\n", incomingPacket.fileName);
+                    delete(connectionSocket,incomingPacket.fileName, incomingPacket.clientName);   
                     break;
                 case TYPE_DOWNLOAD_READY:
+                    printf("\nUploading %s...\n", incomingPacket.fileName);
                     upload(connectionSocket,clientPath,incomingPacket.clientName,FALSE);
-                    bzero(lastFile,FILENAME_SIZE);  
+                    printf("\n%s Uploaded.\n", incomingPacket.fileName);
                     break;
                 case TYPE_UPLOAD_READY:
+                    printf("\nDownloading %s...\n", incomingPacket.fileName);
                     download(connectionSocket,incomingPacket.fileName,incomingPacket.clientName,FALSE);
-                    bzero(lastFile,FILENAME_SIZE);  
+                    printf("\n%s Downloaded.\n", incomingPacket.fileName);
                     break;
                 case TYPE_LIST_SERVER_READY:
                     clientListServer(connectionSocket);
-                    bzero(lastFile,FILENAME_SIZE);  
                     break;
                 case TYPE_GET_SYNC_DIR_READY:
                     clientSyncServer(connectionSocket, incomingPacket.clientName);
                     printf("\nAll Files Updated.\n");
-                    bzero(lastFile,FILENAME_SIZE);  
+                    break;
+                case TYPE_INOTIFY_CONFIRMATION:
+                    pthread_cond_signal(&noInotify);
                     break;
                 default:
                     break;
         }
         pthread_mutex_unlock(&clientMutex);
-        sem_getvalue(&inotifySemaphore,&semStatus);
-        if (semStatus == 0) {
-            sem_post(&inotifySemaphore);
-        }
+        pthread_mutex_unlock(&writeListenMutex);
+        pthread_cond_signal(&noInotify);
+        checkAndPost(&writerSemaphore);
+        pthread_mutex_unlock(&listenerInotifyMut);
     }
 }
 
@@ -187,10 +197,10 @@ void deleteAll(char* clientName) {
 
 
 void *inotifyWatcher(void *inotifyClient){
-    int length;
     int fd;
     int wd;
     char buffer[BUF_LEN];
+
 
 
    
@@ -206,17 +216,21 @@ void *inotifyWatcher(void *inotifyClient){
 
     while (1) {
         int i = 0;
-        inotifyInAction = FALSE;
-        length = read( fd, buffer, BUF_LEN );
 
-        if ( length < 0 ) {
+        inotifyLength = 0;
+        inotifyLength = read( fd, buffer, BUF_LEN );
+        pthread_mutex_lock(&listenerInotifyMut);
+
+        if ( inotifyLength < 0 ) {
             perror( "read" );
         }
-        
+        pthread_mutex_lock(&writeListenMutex);
+
         if(!synching){   
-            while ( i < length ) {
-                inotifyInAction = TRUE;
-                sem_wait(&inotifySemaphore);
+            while ( i < inotifyLength ) {
+                while(listenerStatus) {
+                    pthread_cond_wait(&noInotify, &listenerInotifyMut);
+                }
                 struct inotify_event *event = ( struct inotify_event * ) &buffer[ i ];
                 if ( event->len ) {
                     if(event->name != NULL) {
@@ -224,59 +238,83 @@ void *inotifyWatcher(void *inotifyClient){
                         strcat(clientPath,"/");
                         strcat(clientPath,event->name);
                     }
-                    if ((event->mask & IN_CLOSE_WRITE)){
-                        if(strcmp(event->name,lastFile)!=0){
-                            //cria o caminho: username/file
-                            printf( "\nThe file %s was created in %s.\n", event->name,((struct inotyClient*) inotifyClient)->userName);
-                            inotifyUpCommand(((struct inotyClient*) inotifyClient)->socket, event->name, ((struct inotyClient*) inotifyClient)->userName, TRUE);      
+                    if(!checkTemp(event->name)){
+                        if ((event->mask & IN_CLOSE_WRITE)){
+                            if(strcmp(event->name,lastFile)!=0){
+                                //cria o caminho: username/file
+                                printf( "\nThe file %s was created in %s.\n", event->name,((struct inotyClient*) inotifyClient)->userName);
+                                inotifyUpCommand(((struct inotyClient*) inotifyClient)->socket, event->name, ((struct inotyClient*) inotifyClient)->userName, TRUE);
+                                bzero(lastFile,FILENAME_SIZE);      
+                            }
+                            else{
+                                printf("\nNão precisa ativar o Inotify\n");
+                                bzero(lastFile,FILENAME_SIZE);
+                            }
+                        } else if (event->mask & IN_MOVED_TO) {
+                        
+                            if(strcmp(event->name,lastFile)!=0){
+                                //cria o caminho: username/file
+                                printf( "\nThe file %s was created in %s.\n", event->name,((struct inotyClient*) inotifyClient)->userName);
+                                inotifyUpCommand(((struct inotyClient*) inotifyClient)->socket, event->name, ((struct inotyClient*) inotifyClient)->userName, TRUE);
+                                bzero(lastFile,FILENAME_SIZE);      
+                            }
+                            else{
+                                printf("\nNão precisa ativar o Inotify\n");
+                                bzero(lastFile,FILENAME_SIZE);
+                            }
                         }
-                        else{
-
-                            printf("Não precisa ativar o Inotify\n");
-                            bzero(lastFile,FILENAME_SIZE);
+                        else if ( event->mask & IN_DELETE || event->mask & IN_MOVED_FROM) {
+                            if(strcmp(event->name,lastFile)!=0){
+                                //cria o caminho: username/file
+                                printf( "\nThe file %s was deleted in %s.\n", event->name,((struct inotyClient*) inotifyClient)->userName);
+                                inotifyDelCommand(((struct inotyClient*) inotifyClient)->socket, event->name, ((struct inotyClient*) inotifyClient)->userName);
+                                bzero(lastFile,FILENAME_SIZE);
+                            }
+                            else{
+                                printf("\nNão precisa ativar o Inotify\n");
+                                bzero(lastFile,FILENAME_SIZE);
+                            }
+                                
                         }
-                    } else if (event->mask & IN_MOVED_TO) {
-                    
-                        if(strcmp(event->name,lastFile)!=0){
-                            //cria o caminho: username/file
-                            printf( "\nThe file %s was created in %s.\n", event->name,((struct inotyClient*) inotifyClient)->userName);
-                            inotifyUpCommand(((struct inotyClient*) inotifyClient)->socket, event->name, ((struct inotyClient*) inotifyClient)->userName, TRUE);      
-                        }
-                        else{
-
-                            printf("Não precisa ativar o Inotify\n");
-                            bzero(lastFile,FILENAME_SIZE);
-                        }
+                    } else {
                     }
-                    else if ( event->mask & IN_DELETE || event->mask & IN_MOVED_FROM) {
-                        if(strcmp(event->name,lastFile)!=0){
-                            //cria o caminho: username/file
-                            printf( "\nThe file %s was deleted in %s.\n", event->name,((struct inotyClient*) inotifyClient)->userName);
-                            inotifyDelCommand(((struct inotyClient*) inotifyClient)->socket, event->name, ((struct inotyClient*) inotifyClient)->userName);
-                            //inotifyDelCommand(((struct inotyClient*) inotifyClient)->socket, ((struct inotyClient*) inotifyClient)->userName ,((struct inotyClient*) inotifyClient)->userName);        
-                        }
-                        else{
-                            printf("Não precisa ativar o Inotify\n");
-                            bzero(lastFile,FILENAME_SIZE);
-                        }
-                            
-                    }
-
                 }
                 i += EVENT_SIZE + event->len;
-                sem_post(&listenerSemaphore);
-
+                pthread_cond_signal(&noListen);
             }
+            
         }
-        
-        
+        pthread_mutex_unlock(&writeListenMutex);
+        pthread_mutex_unlock(&listenerInotifyMut);
 
     }
+
     ( void ) inotify_rm_watch( fd, wd );
     ( void ) close( fd );
 }
 
+int checkTemp(char* eventName) {
+    char fileName[FILENAME_SIZE];
+    char* firstHalf;
+    strcpy(fileName,eventName);
+    firstHalf = strtok(fileName,"-");
+    if(firstHalf != NULL){
+        if (strcmp(firstHalf,".goutputstream") == 0) {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+void checkAndPost(sem_t *semaphore) {
+    int semStatus;
+    sem_getvalue(semaphore,&semStatus);
+    if (semStatus == 0) {
+        sem_post(semaphore);
+    }
+}
+
 void semInit() {
-    sem_init(&inotifySemaphore,0,1);
-    sem_init(&listenerSemaphore,0,0);
+    sem_init(&writerSemaphore,0,0);
 }

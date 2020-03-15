@@ -30,7 +30,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/exec/client/client",
-            "args": ["DEBUG","localhost"],
+            "args": ["DEBUG","localhost", "4000"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

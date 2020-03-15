@@ -16,9 +16,15 @@
 #include <semaphore.h>
 #include "../../include/common/common.h"
 
+//#define MD5_LEN 32
+
 extern pthread_mutex_t clientMutex;
 
-extern sem_t inotifySemaphore; 
+extern pthread_mutex_t writeListenMutex;
+
+extern sem_t inotifySemaphore;
+
+extern sem_t writerSemaphore;
 
 struct inotyClient{
   char userName[64];
@@ -49,6 +55,15 @@ void clientSyncServer(int sockfd, char* clientName);
   Deleta todos os arquivos da pasta de um cliente
 */
 void deleteAll(char* clientName);
+
+/*
+  Verifica se é um arquivo temporário do gedit
+*/
+int checkTemp(char* eventName);
+/*
+  Se o semaforo está em zero, dá post. Usado para controle de fluxo
+*/
+void checkAndPost(sem_t *semaphore);
 /*
  Inicializa Semaforos
 */

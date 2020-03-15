@@ -10,6 +10,10 @@
 
 #define PORT 4000
 
+#define ERRORCODE -1
+
+#define SUCCESS 0
+
 #define TRUE 1
 
 #define FALSE 0
@@ -28,6 +32,8 @@
 #define TYPE_UPLOAD 10
 
 #define TYPE_UPLOAD_READY 11
+
+#define TYPE_MIRROR_UPLOAD 12
 
 #define TYPE_DOWNLOAD 20
 
@@ -51,6 +57,8 @@
 
 #define TYPE_INOTIFY 70
 
+#define TYPE_INOTIFY_CONFIRMATION 72
+
 #define TYPE_INOTIFY_DELETE 75
 
 #define PACKET_SIZE (sizeof (struct packet))
@@ -58,7 +66,7 @@
 
 typedef struct packet {
     uint16_t type; // Tipo do pacote ( DATA | CMD )
-    uint16_t seqn; // Numero de sequencia
+    uint32_t seqn; // Numero de sequencia
     uint16_t length; // Comprimento do payload
     uint32_t total_size; // Numero total de fragmentos
     char clientName[CLIENT_NAME_SIZE];
@@ -87,7 +95,7 @@ void upload(int sockfd, char* path, char* clientName, int server);
 /**
  * Manda um Packet do TYPE_UPLOAD
  * */
-void uploadCommand(int sockfd, char* path, char* clientName, int server);
+int uploadCommand(int sockfd, char* path, char* clientName, int server);
 
 /**
  * Faz o download de uma stream de TYPE_DATA
@@ -97,12 +105,12 @@ void download(int sockfd, char* fileName, char* clientName, int server);
 /**
  * Manda um Packet do TYPE_DOWNLOAD
  * */
-void downloadCommand(int sockfd, char* path, char* clientName, int server);
+int downloadCommand(int sockfd, char* path, char* clientName, int server);
 
 /*
   Envia um packet do TYPE_DELETE
 */
-void deleteCommand(int sockfd,char *path, char *clientName);
+int deleteCommand(int sockfd,char *path, char *clientName);
 
 /*
   Deleta o arquivo
@@ -112,7 +120,7 @@ void delete(int sockfd, char* fileName, char* pathUser);
 /*
   Envia um packet do TYPE_LIST_SERVER
 */
-void list_serverCommand(int sockfd, char *clientName);
+int list_serverCommand(int sockfd, char *clientName);
 
 /*
   Lista os arquivos se for cliente, se for servidor, envia a lista de arquivos
@@ -122,7 +130,7 @@ void list_files(int sockfd,char *pathToUser, int server);
 /*
   Lista os arquivos
 */
-void list_clientCommand(int sockfd, char *clientName);
+int list_clientCommand(int sockfd, char *clientName);
 
 /*
   Manda um packet falando que um arquivo apareceu na pasta e está pronto para upload
@@ -132,7 +140,7 @@ void inotifyUpCommand(int sockfd, char* path, char* clientName, int server);
 /*
   Packet do TYPE_GET_SYNC_DIR
 */
-void getSyncDirCommand(int sockfd, char* clientName);
+int getSyncDirCommand(int sockfd, char* clientName);
 
 /*
   Lança uma thread para ficar no watcher no path de argumento
@@ -188,6 +196,14 @@ void uploadAll(int sockfd,char *pathToUser);
 */
 void inotifyDelCommand(int sockfd, char *path, char *clientName);
 
+/*
+ Espelha um upload
+*/
+void mirrorUploadCommand(int sockfd, char *path, char *clientName);
+/*
+  Confirma que o servidor fez a ação do inotify
+*/
+void inotifyConfirmation(int sockfd, char *path, char *clientName);
 
 
 #endif

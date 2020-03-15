@@ -1,5 +1,6 @@
 #ifndef __server__
 #define __server__
+#include <pthread.h>
 #define MAXNAME 64
 #define MAXFILES 20
 #define FREEDEV -1
@@ -39,6 +40,7 @@ struct client
 {
   int devices[2];
   char userName[MAXNAME];
+  pthread_mutex_t clientPairMutex;
 };
 
 struct clientList
