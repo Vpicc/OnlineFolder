@@ -1,5 +1,7 @@
 # OnlineFolder
 
+Online file backup client and server in C.
+
 bin: pasta de objetos
 
 include:
