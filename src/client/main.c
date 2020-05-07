@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
         
 
         // Switch for options
-        if(strcmp(option,"exit\n") == 0) {
+        if(strcmp(option,"exit") == 0) {
             exitCommand = TRUE;
         } else if (strcmp(option, "upload") == 0) { // upload from path
             uploadCommand(sockfd,path,argv[1], FALSE);          

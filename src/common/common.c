@@ -284,7 +284,7 @@ void download(int sockfd, char* fileName, char* clientName, int server) {
 
         downloaded += (int)packetToDownload.length;
 
-        sprintf(response,"%s %u %s","Downloaded ",downloaded, " bytes from file.");
+        sprintf(response,"%s %u %s","Uploaded ",downloaded, " bytes from file.");
 
         status = write(sockfd, response, PAYLOAD_SIZE);
         
@@ -487,10 +487,10 @@ void delete(int sockfd,char* fileName, char* pathUser){
 
     int status;
     char response[PAYLOAD_SIZE];
-    char filePath[]="";
+    char* filePath;
     bzero(response,PAYLOAD_SIZE);
 
-    pathToFile(filePath,pathUser,fileName);
+    filePath = pathToFile(pathUser,fileName);
 
     if(remove(filePath)==0){
         sprintf(response,"%s deleted sucessfully",fileName);
@@ -537,12 +537,13 @@ void list_serverCommand(int sockfd, char *clientName){
     } while (strcmp(response,"  ") != 0);
 
 }
-void pathToFile(char* pathToFile ,char* pathUser, char* fileName){
-    
+char* pathToFile(char* pathUser, char* fileName) {
+    char* pathToFile;
+    pathToFile = malloc(strlen(pathUser) + strlen(fileName) + 1);
     strcpy(pathToFile,pathUser);
     strcat(pathToFile,"/");
     strcat(pathToFile,fileName);
-
+    return pathToFile;
 }
 /*Lista arquivos em uma pasta */
 void list_files(int sockfd,char *pathToUser, int server){
@@ -551,7 +552,7 @@ void list_files(int sockfd,char *pathToUser, int server){
     char mtime[40];
     char atime[40];
     char ctime[40];
-    char filePath[]="";
+    char* filePath;
     int status;
     char response[PAYLOAD_SIZE];
     DIR *dir;
@@ -564,8 +565,7 @@ void list_files(int sockfd,char *pathToUser, int server){
     {
 
         if(strcmp(lsdir->d_name,".") !=0 && strcmp(lsdir->d_name,"..") !=0){
-            bzero(filePath,sizeof(filePath));
-            pathToFile(filePath,pathToUser,lsdir->d_name);
+            filePath = pathToFile(pathToUser,lsdir->d_name);
             stat(filePath, &sb);
             strftime(ctime, 40, "%c", localtime(&(sb.st_ctime)));
             strftime(atime, 40, "%c", localtime(&(sb.st_atime)));

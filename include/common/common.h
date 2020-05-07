@@ -57,12 +57,24 @@ void serializePacket(packet* inPacket, char* serialized);
 
 void deserializePacket(packet* outPacket, char* serialized);
 
+/**
+ * Faz o upload de uma stream de TYPE_DATA
+ * */
 void upload(int sockfd, char* path, char* clientName, int server);
 
+/**
+ * Manda um Packet do TYPE_UPLOAD, depois envia usando a funcao upload
+ * */
 void uploadCommand(int sockfd, char* path, char* clientName, int server);
 
+/**
+ * Faz o download de uma stream de TYPE_DATA
+ * */
 void download(int sockfd, char* fileName, char* clientName, int server);
 
+/**
+ * Manda um Packet do TYPE_DOWNLOAD, depois fica pronto para receber uma stream TYPE_DATA usando a funcao download
+ * */
 void downloadCommand(int sockfd, char* path, char* clientName, int server);
 
 void deleteCommand(int sockfd,char *path, char *clientName);
@@ -95,4 +107,4 @@ void setPacket(packet *packetToSet,int type, int seqn, int length, int total_siz
 /*
  Atribui caminho relativo ate arquivo
 */
-void pathToFile(char* pathToFile ,char* pathUser, char* fileName);
+char* pathToFile(char* pathUser, char* fileName);
